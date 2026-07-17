@@ -9,17 +9,22 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
-
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(
-        builder.Configuration.GetConnectionString("DefaultConnection")
-    ));
+        builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Product API",
+        Version = "v1"
+    });
+
     c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {
         Name = "Authorization",
@@ -27,7 +32,7 @@ builder.Services.AddSwaggerGen(c =>
         Scheme = "bearer",
         BearerFormat = "JWT",
         In = ParameterLocation.Header,
-        Description = "Enter: Bearer {your JWT token}"
+        Description = "Enter JWT Token. Example: Bearer eyJhbGciOiJIUzI1NiIs..."
     });
 
     c.AddSecurityRequirement(new OpenApiSecurityRequirement
@@ -44,35 +49,32 @@ builder.Services.AddSwaggerGen(c =>
             Array.Empty<string>()
         }
     });
-}); 
-builder.Services.AddScoped<ProductRepository>();
+});
 
+builder.Services.AddScoped<ProductRepository>();
 builder.Services.AddScoped<ProductService>();
+
 // JWT Authentication
-builder.Services.AddAuthentication(
-    JwtBearerDefaults.AuthenticationScheme)
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 .AddJwtBearer(options =>
 {
-    options.Authority =
-        builder.Configuration["Authentication:Authority"];
-
-    options.Audience =
-        builder.Configuration["Authentication:Audience"];
-
     options.RequireHttpsMetadata = false;
+    options.SaveToken = true;
 
     options.TokenValidationParameters = new TokenValidationParameters
     {
         ValidateIssuer = true,
-        // Accept the issuer both with and without a trailing slash
-        ValidIssuers = new[]
-        {
-            "https://localhost:7281/",
-            "https://localhost:7281"
-        },
         ValidateAudience = true,
-        ValidAudience = builder.Configuration["Authentication:Audience"],
-        ValidateLifetime = true
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+
+        IssuerSigningKey = new SymmetricSecurityKey(
+            Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!)),
+
+        ClockSkew = TimeSpan.Zero
     };
 });
 
@@ -80,7 +82,6 @@ builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
-// Configure middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -89,7 +90,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-app.UseAuthentication();   // Must come before UseAuthorization
+app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();

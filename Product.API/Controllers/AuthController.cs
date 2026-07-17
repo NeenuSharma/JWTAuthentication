@@ -43,16 +43,12 @@ public class AuthController : ControllerBase
     private string GenerateToken(string email)
     {
         var claims = new[]
-        {
-            new Claim(
-                JwtRegisteredClaimNames.Email,
-                email
-            ),
-
-            new Claim(
-                JwtRegisteredClaimNames.Jti,
-                Guid.NewGuid().ToString()
-            )
+         {
+            new Claim(JwtRegisteredClaimNames.Email, email),
+            new Claim(ClaimTypes.Email, email),
+            new Claim(ClaimTypes.Name, email),
+            new Claim(ClaimTypes.Role, "Admin"),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
 
 
